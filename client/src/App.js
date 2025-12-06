@@ -360,6 +360,46 @@ function App() {
     }
   };
 
+  // Copy and auto-paste image
+  const copyAndPasteImage = async (imgData) => {
+    try {
+      if (isElectron && window.require) {
+        const { ipcRenderer } = window.require("electron");
+        ipcRenderer.send("copy-and-paste", {
+          type: "image",
+          content: imgData.preview,
+        });
+        showAlert("success", "✅ Copied! Pasting to other window...");
+      } else {
+        showAlert("error", "Auto-paste only works in Electron app");
+      }
+    } catch (error) {
+      console.error("Failed to copy and paste:", error);
+      showAlert("error", "Failed to copy and paste");
+    }
+  };
+
+  // Copy and auto-paste text
+  const copyAndPasteText = async (textMsg) => {
+    try {
+      if (isElectron && window.require) {
+        const { ipcRenderer } = window.require("electron");
+        ipcRenderer.send("copy-and-paste", {
+          type: "text",
+          content: textMsg,
+        });
+        showAlert("success", "✅ Copied! Pasting to other window...");
+      } else {
+        // Fallback for web
+        await navigator.clipboard.writeText(textMsg);
+        showAlert("success", "✅ Copied! Press Ctrl+V to paste");
+      }
+    } catch (error) {
+      console.error("Failed to copy:", error);
+      showAlert("error", "Failed to copy");
+    }
+  };
+
   // Paste single image to current image field
   const pasteSingleImage = (imgData) => {
     if (imgData.file) {
@@ -620,10 +660,10 @@ function App() {
                     </button>
                     <button
                       className="paste-preset-btn"
-                      onClick={() => pasteSingleText(textMsg)}
-                      title="Paste to input field"
+                      onClick={() => copyAndPasteText(textMsg)}
+                      title="Copy & Auto-paste to other window"
                     >
-                      📝
+                      🚀 Paste
                     </button>
                     <button
                       className="send-preset-btn"
@@ -655,16 +695,16 @@ function App() {
                       <button
                         className="copy-preset-btn-small"
                         onClick={() => copySingleImage(imgData)}
-                        title="Copy name"
+                        title="Copy to clipboard"
                       >
                         📋
                       </button>
                       <button
                         className="paste-preset-btn-small"
-                        onClick={() => pasteSingleImage(imgData)}
-                        title="Paste to input"
+                        onClick={() => copyAndPasteImage(imgData)}
+                        title="Copy & Auto-paste to other window"
                       >
-                        📝
+                        🚀
                       </button>
                       <button
                         className="send-preset-btn-small"

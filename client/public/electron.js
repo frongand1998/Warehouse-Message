@@ -221,6 +221,37 @@ ipcMain.on("copy-to-clipboard", (event, data) => {
   }
 });
 
+ipcMain.on("copy-and-paste", (event, data) => {
+  // Copy to clipboard first
+  if (data.type === "text") {
+    clipboard.writeText(data.content);
+  } else if (data.type === "image") {
+    const image = nativeImage.createFromDataURL(data.content);
+    clipboard.writeImage(image);
+  }
+  
+  // Hide the window
+  if (mainWindow) {
+    mainWindow.hide();
+  }
+  
+  // Wait for window to hide and other app to focus
+  setTimeout(() => {
+    // Send key events using webContents
+    try {
+      const { exec } = require('child_process');
+      // Use PowerShell to send Ctrl+V
+      if (process.platform === "win32") {
+        exec('powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait(\'^v\')"');
+      }
+    } catch (error) {
+      console.error('Auto-paste error:', error);
+      // Fallback: just show notification
+      event.reply('paste-failed', 'Please press Ctrl+V to paste');
+    }
+  }, 300);
+});
+
 ipcMain.on("get-clipboard-history", (event) => {
   event.reply("clipboard-history", clipboardHistory);
 });

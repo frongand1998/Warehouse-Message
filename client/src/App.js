@@ -780,8 +780,8 @@ function App() {
       {messages.length > 0 && (
         <div className="message-history">
           <h2>Recent Messages</h2>
-          {messages.slice(0, 10).map((msg) => (
-            <div key={msg._id} className="message-item">
+          {messages.slice(0, 10).map((msg, index) => (
+            <div key={msg._id || msg.id || index} className="message-item">
               <div>
                 <strong>{msg.text}</strong>
                 <span className={`message-status ${msg.status}`}>

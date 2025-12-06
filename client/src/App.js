@@ -11,7 +11,6 @@ function App() {
   const [imagePreview, setImagePreview] = useState(null);
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
-  const [recipientId, setRecipientId] = useState('');
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState({ show: false, type: '', message: '' });
   const [messages, setMessages] = useState([]);
@@ -115,7 +114,7 @@ function App() {
 
   const fetchMessages = async () => {
     try {
-      const response = await axios.get('/api/messenger/messages');
+      const response = await axios.get('/api/messages');
       if (response.data.success) {
         setMessages(response.data.messages);
       }
@@ -178,51 +177,29 @@ function App() {
     setLoading(true);
 
     try {
-      // Send text if provided
-      if (text.trim()) {
-        const formData = new FormData();
-        formData.append('text', text);
-        if (recipientId.trim()) {
-          formData.append('recipientId', recipientId);
-        }
+      const formData = new FormData();
+      formData.append('text', text.trim() || 'Multiple images');
+      
+      // Add all images to the same request
+      images.forEach((img) => {
+        formData.append('images', img);
+      });
 
-        await axios.post('/api/messenger/send', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-      }
+      await axios.post('/api/messages', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
-      // Send each image separately
-      for (const img of images) {
-        const formData = new FormData();
-        formData.append('text', img.name || 'Image');
-        formData.append('image', img);
-        if (recipientId.trim()) {
-          formData.append('recipientId', recipientId);
-        }
-
-        await axios.post('/api/messenger/send', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        // Wait 1 second between images
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      showAlert('success', `Successfully sent ${text.trim() ? '1 text + ' : ''}${images.length} image(s) to Facebook Messenger!`);
+      showAlert('success', `Successfully stored ${text.trim() ? '1 text + ' : ''}${images.length} image(s)!`);
       setText('');
       setImages([]);
       setImagePreviews([]);
-      setRecipientId('');
       fetchMessages();
     } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to send message. Please try again.';
-      const errorDetails = error.response?.data?.details;
-      showAlert('error', `${errorMessage}${errorDetails ? ': ' + JSON.stringify(errorDetails) : ''}`);
+      console.error('Error storing message:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to store message. Please try again.';
+      showAlert('error', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -274,19 +251,16 @@ function App() {
     try {
       const formData = new FormData();
       formData.append('text', textMsg);
-      if (recipientId.trim()) {
-        formData.append('recipientId', recipientId);
-      }
 
-      await axios.post('/api/messenger/send', formData);
-      showAlert('success', 'Message sent successfully!');
+      await axios.post('/api/messages', formData);
+      showAlert('success', 'Message stored successfully!');
       
       // Remove from presets after successful send
       removeTextPreset(index);
       fetchMessages();
     } catch (error) {
-      console.error('Error sending text preset:', error);
-      showAlert('error', 'Failed to send message');
+      console.error('Error storing text preset:', error);
+      showAlert('error', 'Failed to store message');
     }
   };
 
@@ -318,26 +292,22 @@ function App() {
       
       // Convert data URL back to blob if needed
       if (imgData.file) {
-        formData.append('image', imgData.file);
+        formData.append('images', imgData.file);
       } else if (imgData.preview) {
         const response = await fetch(imgData.preview);
         const blob = await response.blob();
-        formData.append('image', blob, imgData.name);
-      }
-      
-      if (recipientId.trim()) {
-        formData.append('recipientId', recipientId);
+        formData.append('images', blob, imgData.name);
       }
 
-      await axios.post('/api/messenger/send', formData);
-      showAlert('success', 'Image sent successfully!');
+      await axios.post('/api/messages', formData);
+      showAlert('success', 'Image stored successfully!');
       
       // Remove from presets after successful send
       removeImagePreset(index);
       fetchMessages();
     } catch (error) {
-      console.error('Error sending image preset:', error);
-      showAlert('error', 'Failed to send image');
+      console.error('Error storing image preset:', error);
+      showAlert('error', 'Failed to store image');
     }
   };
 
@@ -366,7 +336,7 @@ function App() {
   // Send all presets
   const sendAllPresets = async () => {
     if (textPresets.length === 0 && imagePresets.length === 0) {
-      showAlert('error', 'No presets to send');
+      showAlert('error', 'No presets to store');
       return;
     }
 
@@ -380,15 +350,12 @@ function App() {
         try {
           const formData = new FormData();
           formData.append('text', textMsg);
-          if (recipientId.trim()) {
-            formData.append('recipientId', recipientId);
-          }
 
-          await axios.post('/api/messenger/send', formData);
+          await axios.post('/api/messages', formData);
           successCount++;
           await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between messages
         } catch (error) {
-          console.error('Error sending text preset:', error);
+          console.error('Error storing text preset:', error);
           failCount++;
         }
       }
@@ -401,27 +368,23 @@ function App() {
           
           // Convert data URL back to blob if needed
           if (imageData.file) {
-            formData.append('image', imageData.file);
+            formData.append('images', imageData.file);
           } else if (imageData.preview) {
             const response = await fetch(imageData.preview);
             const blob = await response.blob();
-            formData.append('image', blob, imageData.name);
-          }
-          
-          if (recipientId.trim()) {
-            formData.append('recipientId', recipientId);
+            formData.append('images', blob, imageData.name);
           }
 
-          await axios.post('/api/messenger/send', formData);
+          await axios.post('/api/messages', formData);
           successCount++;
           await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between messages
         } catch (error) {
-          console.error('Error sending image preset:', error);
+          console.error('Error storing image preset:', error);
           failCount++;
         }
       }
 
-      showAlert('success', `Sent ${successCount} messages successfully${failCount > 0 ? `, ${failCount} failed` : ''}!`);
+      showAlert('success', `Stored ${successCount} messages successfully${failCount > 0 ? `, ${failCount} failed` : ''}!`);
       
       // Clear presets after successful send
       if (failCount === 0) {
@@ -432,7 +395,7 @@ function App() {
       
       fetchMessages();
     } catch (error) {
-      showAlert('error', 'Error sending presets');
+      showAlert('error', 'Error storing presets');
     } finally {
       setSendingPresets(false);
     }
@@ -478,7 +441,7 @@ function App() {
     <div className="App">
       <header className="header">
         <h1>📦 Warehouse Message</h1>
-        <p>Send messages with images to Facebook Messenger</p>
+        <p>Clipboard monitoring and message storage</p>
       </header>
 
       {alert.show && (
@@ -488,20 +451,6 @@ function App() {
       )}
 
       <form className="messenger-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="recipientId">Recipient ID (optional)</label>
-          <input
-            type="text"
-            id="recipientId"
-            value={recipientId}
-            onChange={(e) => setRecipientId(e.target.value)}
-            placeholder="Leave empty to use default recipient from .env"
-          />
-          <small style={{ color: '#666', fontSize: '0.85rem' }}>
-            Enter the Facebook Page-Scoped ID (PSID) of the recipient
-          </small>
-        </div>
-
         <div className="form-group">
           <label htmlFor="text">Message Text *</label>
           <textarea
@@ -559,7 +508,7 @@ function App() {
 
         <button type="submit" className="submit-btn" disabled={loading}>
           {loading && <span className="loading-spinner"></span>}
-          {loading ? 'Sending...' : 'Send to Messenger'}
+          {loading ? 'Storing...' : '💾 Store Message'}
         </button>
 
         <button type="button" className="preset-btn" onClick={addToPresets} disabled={loading}>
@@ -585,7 +534,7 @@ function App() {
                 disabled={sendingPresets}
               >
                 {sendingPresets && <span className="loading-spinner"></span>}
-                {sendingPresets ? 'Sending All...' : `📤 Send All (${textPresets.length + imagePresets.length})`}
+                {sendingPresets ? 'Storing All...' : `💾 Store All (${textPresets.length + imagePresets.length})`}
               </button>
               <button className="clear-all-btn" onClick={clearAllPresets}>
                 🗑️ Clear All
@@ -618,7 +567,7 @@ function App() {
                       className="send-preset-btn" 
                       onClick={() => sendSingleTextPreset(textMsg, index)}
                     >
-                      📤 Send
+                      💾 Store
                     </button>
                     <button 
                       className="remove-preset-btn" 
@@ -658,9 +607,9 @@ function App() {
                       <button 
                         className="send-preset-btn-small" 
                         onClick={() => sendSingleImagePreset(imgData, index)}
-                        title="Send"
+                        title="Store"
                       >
-                        📤
+                        💾
                       </button>
                       <button 
                         className="remove-preset-btn" 

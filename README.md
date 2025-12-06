@@ -1,30 +1,81 @@
 # Warehouse Message
 
-A desktop application (built with Electron + MERN stack) that allows users to upload images and text, send them directly to Facebook Messenger, and monitor clipboard activity across all applications.
+A cross-platform desktop application (Electron + MERN stack) that sends messages to Facebook Messenger with system-wide clipboard monitoring across all applications.
 
-## Features
+## ✨ Key Features
 
-- 📝 Send text messages to Facebook Messenger
-- 📷 Upload and send multiple images with messages
-- 💾 Store message history in MongoDB (optional)
-- 🎨 Modern, responsive UI with gradient design
-- ✅ Real-time message status tracking
-- 💼 **Preset Management**: Save frequently used text and images offline
-- 📋 **Clipboard Monitoring**: Track clipboard changes across all applications
-- ⌨️ **Global Hotkeys**: 
-  - `Ctrl+Shift+V` - Show clipboard history
-  - `Ctrl+Shift+W` - Toggle window visibility
-- 🖥️ **System Tray**: Runs in background, minimize to tray
-- 🔄 **Batch Operations**: Send all presets at once or individually
-- 📥 **Paste Support**: Ctrl+V to paste images directly from clipboard
+### 🖥️ Desktop Application
+- **Cross-platform**: Windows, macOS, Linux
+- **System Tray**: Runs in background, minimize to tray
+- **Global Hotkeys**: 
+  - `Ctrl+Shift+V` (or `Cmd+Shift+V`) - Show clipboard history
+  - `Ctrl+Shift+W` (or `Cmd+Shift+W`) - Toggle window visibility
 
-## Tech Stack
+### 📋 Clipboard Monitoring
+- **System-wide monitoring**: Tracks clipboard across ALL applications
+- **Multi-format support**: Text and images
+- **History storage**: Up to 50 recent items
+- **Real-time notifications**: Alerts on clipboard changes
 
-- **Desktop Framework**: Electron
-- **Frontend**: React.js
-- **Backend**: Node.js, Express.js
+### 📱 Facebook Messenger Integration
+- **Text messages**: Send formatted text to Messenger
+- **Multiple images**: Upload and send multiple images at once
+- **Batch operations**: Send all presets sequentially
+- **Status tracking**: Real-time delivery confirmation
+
+### 💼 Preset Management
+- **Offline storage**: Save frequently used content (localStorage)
+- **Quick send**: One-click sending of saved items
+- **Copy/Paste**: Individual item clipboard operations
+- **Persistent**: Survives app restarts
+
+### 🎨 Modern UI
+- **Responsive design**: Beautiful gradient interface
+- **Image previews**: Grid view for multiple images
+- **Drag & drop**: Easy file uploads
+- **Ctrl+V paste**: Paste images directly from clipboard
+
+## 🚀 Quick Start
+
+### Desktop App (Recommended)
+```bash
+# Clone the repository
+git clone https://github.com/frongand1998/Warehouse-Message.git
+cd Warehouse-Message
+
+# Quick start script
+./start.sh       # Mac/Linux
+start.bat        # Windows
+```
+
+### Manual Start
+```bash
+# Terminal 1 - Backend
+cd server
+npm install
+npm start
+
+# Terminal 2 - Electron App
+cd client
+npm install
+npm run electron-dev
+```
+
+## 📚 Documentation
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment guide (Heroku, VPS, GitHub Releases)
+- **[ELECTRON_GUIDE.md](ELECTRON_GUIDE.md)** - Electron architecture and features
+- **[TEST_GUIDE.md](TEST_GUIDE.md)** - Testing checklist and troubleshooting
+- **[README.md](README.md)** - This file (setup and usage)
+
+## 🛠️ Tech Stack
+
+- **Desktop Framework**: Electron (cross-platform desktop apps)
+- **Frontend**: React.js 18.2.0
+- **Backend**: Node.js + Express.js
 - **Database**: MongoDB (optional, works without it)
-- **API**: Facebook Messenger Send API
+- **API**: Facebook Graph API (Messenger Send API)
+- **Build Tool**: electron-builder
 
 ## Prerequisites
 
@@ -272,53 +323,121 @@ This will:
 
 ### Building for Distribution
 
-To build standalone executables:
+Build standalone executables for distribution:
 
-**For Windows:**
 ```bash
 cd client
-npm run dist -- --win
+
+# Build for your platform
+npm run dist -- --win    # Windows .exe installer
+npm run dist -- --mac    # macOS .dmg
+npm run dist -- --linux  # Linux .AppImage + .deb
+
+# Build for all platforms
+npm run dist
 ```
 
-**For macOS:**
+**Output files** will be in `client/dist/`:
+- Windows: `Warehouse Message Setup.exe`
+- macOS: `Warehouse Message.dmg`
+- Linux: `Warehouse Message.AppImage`, `warehouse-message_1.0.0_amd64.deb`
+
+**Distribution options:**
+- Upload to GitHub Releases
+- Host on your own server
+- Share via Google Drive/Dropbox
+- Publish to Microsoft Store / Mac App Store
+
+📖 See [DEPLOYMENT.md](DEPLOYMENT.md) for complete deployment guide.
+
+## 🚢 Deployment
+
+### Backend Server
+
+Deploy the Express server to production:
+
+**Quick Deploy (Heroku):**
 ```bash
-cd client
-npm run dist -- --mac
+cd server
+heroku create warehouse-message-server
+heroku config:set FACEBOOK_PAGE_ACCESS_TOKEN=xxx
+heroku config:set FACEBOOK_PAGE_ID=xxx
+heroku config:set RECIPIENT_ID=xxx
+git init && git add . && git commit -m "Deploy"
+git push heroku main
 ```
 
-**For Linux:**
-```bash
-cd client
-npm run dist -- --linux
-```
+**Other Options:**
+- Railway.app (easiest)
+- DigitalOcean VPS with PM2
+- AWS EC2
+- Your own server
 
-Built files will be in `client/dist/` directory.
+### Desktop App Distribution
 
-## Troubleshooting
+1. **Build** the app for your target platform(s)
+2. **Upload** to GitHub Releases or file hosting
+3. **Share** download link with users
+4. **Optional**: Set up auto-updates with electron-updater
+
+📖 Complete deployment guide: [DEPLOYMENT.md](DEPLOYMENT.md)
+
+## 📖 Additional Documentation
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Server deployment, app distribution, auto-updates
+- **[ELECTRON_GUIDE.md](ELECTRON_GUIDE.md)** - Electron architecture, clipboard monitoring, IPC
+- **[TEST_GUIDE.md](TEST_GUIDE.md)** - Testing checklist, troubleshooting, known issues
+
+## 🐛 Troubleshooting
+
+## 🐛 Troubleshooting
 
 ### Electron Issues
-
-- **App won't start**: Make sure both backend (port 5000) and React dev server (port 3000) are running
-- **Clipboard monitoring not working**: Check that the app has clipboard access permissions in your OS settings
-- **Global shortcuts not working**: Another app might be using the same shortcuts - check for conflicts
-- **Tray icon not showing**: The app uses favicon.ico from public folder - make sure it exists
+- **App won't start**: Ensure backend (port 5000) is running first
+- **Clipboard monitoring not working**: Check OS clipboard access permissions
+- **Global shortcuts not responding**: Another app might be using same shortcuts
+- **Tray icon missing**: Verify `public/favicon.ico` exists
 
 ### Facebook API Errors
+- **Error 190 (Invalid Token)**: Check `FACEBOOK_PAGE_ACCESS_TOKEN` in `.env`
+- **Error 100 (Invalid Recipient)**: Use webhook method to get correct PSID
+- **Image upload failed**: Ensure image is under 10MB and in supported format (JPEG/PNG/GIF)
 
-- **Error 190**: Invalid OAuth 2.0 Access Token - Check your `FACEBOOK_PAGE_ACCESS_TOKEN`
-- **Error 100**: Invalid parameter - Verify your `RECIPIENT_ID` is correct (use webhook method to get PSID)
-- **Image upload failed**: Ensure image is under 10MB and is a supported format
+### Server Issues
+- **Port already in use**: Kill existing process on port 5000 or 3000
+- **MongoDB errors**: MongoDB is optional - app works without it
+- **CORS errors**: Check proxy setting in `client/package.json`
 
-### Connection Issues
+📖 Detailed troubleshooting: [TEST_GUIDE.md](TEST_GUIDE.md)
 
-- MongoDB is optional - the app works without it
-- Check that both frontend and backend servers are running
-- Verify the proxy setting in `client/package.json` points to your backend port (5000)
+## 🤝 Contributing
 
-## Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Feel free to submit issues and enhancement requests!
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## License
+## 📝 License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Electron](https://www.electronjs.org/)
+- React framework by Facebook
+- Facebook Messenger API
+- electron-builder for packaging
+
+## 📧 Support
+
+For issues or questions:
+- Check the documentation files (DEPLOYMENT.md, ELECTRON_GUIDE.md, TEST_GUIDE.md)
+- Review console logs and error messages
+- Open an issue on GitHub
+
+---
+
+**Made with ❤️ for easier Facebook Messenger communication**

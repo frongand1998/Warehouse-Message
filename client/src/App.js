@@ -369,7 +369,7 @@ function App() {
           type: "image",
           content: imgData.preview,
         });
-        showAlert("success", "✅ Copied! Pasting to other window...");
+        showAlert("success", "✅ Copied! Press Ctrl+V in other window");
       } else {
         showAlert("error", "Auto-paste only works in Electron app");
       }
@@ -388,7 +388,7 @@ function App() {
           type: "text",
           content: textMsg,
         });
-        showAlert("success", "✅ Copied! Pasting to other window...");
+        showAlert("success", "✅ Copied! Press Ctrl+V in other window");
       } else {
         // Fallback for web
         await navigator.clipboard.writeText(textMsg);

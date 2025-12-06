@@ -230,28 +230,17 @@ ipcMain.on("copy-and-paste", (event, data) => {
     clipboard.writeImage(image);
   }
 
-  // Hide the window
-  if (mainWindow) {
-    mainWindow.hide();
+  // Notify success
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("copy-success");
   }
 
-  // Wait for window to hide and other app to focus
+  // Hide the window after a short delay
   setTimeout(() => {
-    // Send key events using webContents
-    try {
-      const { exec } = require("child_process");
-      // Use PowerShell to send Ctrl+V
-      if (process.platform === "win32") {
-        exec(
-          "powershell -command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')\""
-        );
-      }
-    } catch (error) {
-      console.error("Auto-paste error:", error);
-      // Fallback: just show notification
-      event.reply("paste-failed", "Please press Ctrl+V to paste");
+    if (mainWindow) {
+      mainWindow.hide();
     }
-  }, 300);
+  }, 500);
 });
 
 ipcMain.on("get-clipboard-history", (event) => {

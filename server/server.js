@@ -48,6 +48,9 @@ const upload = multer({
   }
 });
 
+// Simple message storage (in-memory)
+const messages = [];
+
 // MongoDB Connection (optional - will work without it)
 if (process.env.MONGODB_URI) {
   mongoose.connect(process.env.MONGODB_URI, {
@@ -64,14 +67,51 @@ if (process.env.MONGODB_URI) {
   console.log('⚠️  No MONGODB_URI provided. App will run without database.');
 }
 
-// Import routes
-const messengerRoutes = require('./routes/messenger');
+// API Routes for storing messages
+app.post('/api/messages', upload.array('images', 10), async (req, res) => {
+  try {
+    const { text } = req.body;
+    const images = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    
+    const message = {
+      id: Date.now(),
+      text: text || '',
+      images,
+      createdAt: new Date(),
+      status: 'stored'
+    };
+    
+    messages.push(message);
+    
+    res.json({
+      success: true,
+      message: 'Message stored successfully',
+      data: message
+    });
+  } catch (error) {
+    console.error('Error storing message:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
-// Routes
-app.use('/api/messenger', messengerRoutes);
+app.get('/api/messages', (req, res) => {
+  res.json({
+    success: true,
+    messages: messages.slice(-50).reverse() // Last 50 messages
+  });
+});
 
 app.get('/', (req, res) => {
-  res.json({ message: 'Warehouse Message API is running' });
+  res.json({ 
+    message: 'Warehouse Message API is running',
+    endpoints: {
+      'POST /api/messages': 'Store text and images',
+      'GET /api/messages': 'Get stored messages'
+    }
+  });
 });
 
 app.listen(PORT, () => {

@@ -221,6 +221,28 @@ ipcMain.on("copy-to-clipboard", (event, data) => {
   }
 });
 
+ipcMain.on("copy-and-paste", (event, data) => {
+  // Copy to clipboard first
+  if (data.type === "text") {
+    clipboard.writeText(data.content);
+  } else if (data.type === "image") {
+    const image = nativeImage.createFromDataURL(data.content);
+    clipboard.writeImage(image);
+  }
+
+  // Notify success
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("copy-success");
+  }
+
+  // Hide the window after a short delay
+  setTimeout(() => {
+    if (mainWindow) {
+      mainWindow.hide();
+    }
+  }, 500);
+});
+
 ipcMain.on("get-clipboard-history", (event) => {
   event.reply("clipboard-history", clipboardHistory);
 });

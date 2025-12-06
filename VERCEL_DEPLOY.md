@@ -15,6 +15,22 @@
 
 ### Step 1: Deploy Backend to Vercel
 
+**Option A: Using Vercel Dashboard (Recommended for Codespaces)**
+
+1. Go to https://vercel.com/new
+2. Click "Import Git Repository"
+3. Select your `Warehouse-Message` repository
+4. Configure project settings:
+   - **Framework Preset**: Other
+   - **Root Directory**: `server`
+   - **Build Command**: (leave empty)
+   - **Output Directory**: (leave empty)
+5. Click "Deploy"
+
+**Done!** Your server will be live at: `https://warehouse-message-{random}.vercel.app`
+
+**Option B: Using Vercel CLI (if you have browser access)**
+
 ```bash
 cd /workspaces/Warehouse-Message/server
 
@@ -35,19 +51,23 @@ vercel --prod
 
 **Done!** Your server is now live at: `https://warehouse-message.vercel.app`
 
-### Step 2: Add Environment Variables
+### Step 2: Environment Variables (Optional)
 
+No environment variables are required! The app works without any configuration.
+
+If you want to use MongoDB for persistent storage:
+
+**Via Dashboard:**
+1. Go to your project on Vercel
+2. Settings → Environment Variables
+3. Add: `MONGODB_URI` = `your_mongodb_connection_string`
+
+**Via CLI:**
 ```bash
-# Add your Facebook credentials
-vercel env add FACEBOOK_PAGE_ACCESS_TOKEN
-# Paste: EAAgKRlCmylgBQAYdVi4Yz8F87n86ZAhOqGu1X6Q6jqYAcdpwFZAZAmVoAd9WqhK1ZCrZCgdEcI1opDgPZAArwGt1FGZCydwNdJouoDsT1ZAMVZCt6223XMWDX7cADHhlNjukwQDZAnXLlTiwX9eRLA5aDbsqN8l61hW19Xq2ZBymxUW56fgRarfwEBVKzJcD7U12ETqhZCkcz5dOFwZDZD
-# Select: Production, Preview, Development (press Space to select all, Enter to confirm)
-
-vercel env add FACEBOOK_PAGE_ID
-# Paste: 956640500855155
-
-vercel env add RECIPIENT_ID
-# Paste: 25189818513994127
+vercel env add MONGODB_URI
+# Paste your MongoDB connection string
+# Select: Production, Preview, Development
+```
 
 vercel env add WEBHOOK_VERIFY_TOKEN
 # Paste: my_webhook_token_123
@@ -79,12 +99,9 @@ curl https://your-project.vercel.app/
    - Root Directory: `server`
    - Build Command: (leave empty)
    - Output Directory: (leave empty)
-4. **Add Environment Variables**:
+4. **Environment Variables** (Optional):
    ```
-   FACEBOOK_PAGE_ACCESS_TOKEN = EAAgKRlCmylgBQAYdVi4Yz8F87n86ZAhOqGu1X6Q6jqYAcdpwFZAZAmVoAd9WqhK1ZCrZCgdEcI1opDgPZAArwGt1FGZCydwNdJouoDsT1ZAMVZCt6223XMWDX7cADHhlNjukwQDZAnXLlTiwX9eRLA5aDbsqN8l61hW19Xq2ZBymxUW56fgRarfwEBVKzJcD7U12ETqhZCkcz5dOFwZDZD
-   FACEBOOK_PAGE_ID = 956640500855155
-   RECIPIENT_ID = 25189818513994127
-   WEBHOOK_VERIFY_TOKEN = my_webhook_token_123
+   MONGODB_URI = mongodb+srv://username:password@cluster.mongodb.net/warehouse
    ```
 5. **Click Deploy** 🚀
 
@@ -231,23 +248,12 @@ export API_URL="https://warehouse-message.vercel.app"
 # Test health check
 curl $API_URL/
 
-# Test send endpoint (should return error without data)
-curl $API_URL/api/messenger/send -X POST
+# Test message storage endpoint
+curl $API_URL/api/messages -X POST -F "text=Test message"
 
-# Test webhook (should return challenge)
-curl "$API_URL/api/messenger/webhook?hub.mode=subscribe&hub.challenge=test&hub.verify_token=my_webhook_token_123"
+# Test get messages endpoint
+curl $API_URL/api/messages
 ```
-
-### Update Facebook Webhook
-
-1. Go to: https://developers.facebook.com/apps/
-2. Select your app → **Messenger** → **Settings**
-3. In **Webhooks**, update Callback URL:
-   ```
-   https://warehouse-message.vercel.app/api/messenger/webhook
-   ```
-4. Verify Token: `my_webhook_token_123`
-5. Subscribe to: `messages`, `messaging_postbacks`
 
 ---
 
@@ -258,11 +264,8 @@ curl "$API_URL/api/messenger/webhook?hub.mode=subscribe&hub.challenge=test&hub.v
 1. Go to: https://vercel.com/dashboard
 2. Select your project
 3. Go to **Settings** → **Environment Variables**
-4. Add variables:
-   - `FACEBOOK_PAGE_ACCESS_TOKEN`
-   - `FACEBOOK_PAGE_ID`
-   - `RECIPIENT_ID`
-   - `WEBHOOK_VERIFY_TOKEN`
+4. Add variables (optional):
+   - `MONGODB_URI` - For persistent storage with MongoDB
 5. Select environment: Production, Preview, Development
 6. **Redeploy** for changes to take effect
 
@@ -337,6 +340,14 @@ Vercel Free (Hobby) Tier:
 
 ## Complete Deployment Steps (Copy-Paste Ready)
 
+**Option A: Via Dashboard (Recommended)**
+1. Go to https://vercel.com/new
+2. Import your `Warehouse-Message` repository
+3. Set Root Directory to `server`
+4. Click Deploy
+5. Done! 🎉
+
+**Option B: Via CLI**
 ```bash
 # 1. Navigate to server folder
 cd /workspaces/Warehouse-Message/server
@@ -347,25 +358,19 @@ vercel login
 # 3. Deploy
 vercel --prod
 
-# 4. Add environment variables
-vercel env add FACEBOOK_PAGE_ACCESS_TOKEN
-vercel env add FACEBOOK_PAGE_ID
-vercel env add RECIPIENT_ID
-vercel env add WEBHOOK_VERIFY_TOKEN
+# 4. (Optional) Add MongoDB for persistent storage
+vercel env add MONGODB_URI
 
-# 5. Redeploy with env vars
-vercel --prod
-
-# 6. Get your URL
+# 5. Get your URL
 vercel ls
 
-# 7. Build desktop app
+# 6. Build desktop app
 cd ../client
 echo "REACT_APP_API_URL=https://YOUR-PROJECT.vercel.app" > .env.production
 npm run build
 npm run dist
 
-# 8. Done! 🎉
+# 7. Done! 🎉
 ```
 
 ---
@@ -378,8 +383,26 @@ npm run dist
 ✅ **Auto-deploy**: Push to GitHub = auto deploy  
 ✅ **Free forever**: No credit card needed  
 ✅ **Fast**: Global CDN edge network  
+✅ **Simple**: No configuration required
 
 ---
+
+## Next Steps
+
+1. ✅ **Deploy server** - Use Vercel dashboard
+2. ✅ **Test API** - `curl https://your-url.vercel.app/api/messages`
+3. ✅ **Build desktop app** - Set `REACT_APP_API_URL` and run `npm run dist`
+4. ✅ **Distribute** - Upload built files to GitHub Releases
+
+---
+
+## Support
+
+- Vercel Docs: https://vercel.com/docs
+- Vercel Discord: https://vercel.com/discord
+- Dashboard: https://vercel.com/dashboard
+
+**Deployment made easy! 🚀**
 
 ## Next Steps
 

@@ -131,69 +131,69 @@ function startClipboardMonitor() {
           }
         }
       } else {
-        // Check for files in clipboard (Windows file copy)
-        const files = clipboard.readFiles();
-        if (files && files.length > 0) {
-          // Filter for image files
-          const imageFiles = files.filter((f) =>
-            /\.(jpg|jpeg|png|gif|bmp)$/i.test(f)
-          );
+        // Check clipboard for various formats
+        const text = clipboard.readText();
 
-          if (imageFiles.length > 0) {
-            // Process each image file
-            imageFiles.forEach((filePath) => {
-              try {
-                if (fs.existsSync(filePath)) {
-                  const imageData = fs.readFileSync(filePath);
-                  const image = nativeImage.createFromBuffer(imageData);
-                  if (!image.isEmpty()) {
-                    const dataUrl = image.toDataURL();
-                    const hash = dataUrl.substring(0, 50); // Simple hash for comparison
+        // Check if it contains file paths from Windows file copy
+        const lines = text
+          .split("\n")
+          .map((l) => l.trim())
+          .filter((l) => l);
+        const imageFiles = lines.filter((f) =>
+          /\.(jpg|jpeg|png|gif|bmp)$/i.test(f)
+        );
 
-                    if (hash !== lastClipboardImage) {
-                      addToClipboardHistory({
+        if (imageFiles.length > 0) {
+          // Process image files from clipboard text
+          imageFiles.forEach((filePath) => {
+            try {
+              if (fs.existsSync(filePath)) {
+                const imageData = fs.readFileSync(filePath);
+                const image = nativeImage.createFromBuffer(imageData);
+                if (!image.isEmpty()) {
+                  const dataUrl = image.toDataURL();
+                  const hash = dataUrl.substring(0, 50);
+
+                  if (hash !== lastClipboardImage) {
+                    console.log("Image detected from file path:", filePath);
+                    addToClipboardHistory({
+                      type: "image",
+                      content: dataUrl,
+                      timestamp: Date.now(),
+                    });
+
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                      mainWindow.webContents.send("clipboard-update", {
                         type: "image",
                         content: dataUrl,
-                        timestamp: Date.now(),
                       });
-
-                      if (mainWindow && !mainWindow.isDestroyed()) {
-                        mainWindow.webContents.send("clipboard-update", {
-                          type: "image",
-                          content: dataUrl,
-                        });
-                      }
-                      lastClipboardImage = hash;
-                      lastClipboardText = "";
                     }
+                    lastClipboardImage = hash;
+                    lastClipboardText = "";
                   }
                 }
-              } catch (error) {
-                console.error("Error reading image file:", filePath, error);
               }
-            });
-          }
-          return; // Skip text check if files were detected
-        }
-
-        // Monitor text (only if no image or files)
-        const currentText = clipboard.readText();
-        if (
-          currentText &&
-          currentText !== lastClipboardText &&
-          currentText.trim().length > 0
+            } catch (error) {
+              console.error("Error reading image file:", filePath, error);
+            }
+          });
+        } else if (
+          text &&
+          text !== lastClipboardText &&
+          text.trim().length > 0
         ) {
-          lastClipboardText = currentText;
+          // Regular text
+          lastClipboardText = text;
           addToClipboardHistory({
             type: "text",
-            content: currentText,
+            content: text,
             timestamp: Date.now(),
           });
 
           if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send("clipboard-update", {
               type: "text",
-              content: currentText,
+              content: text,
             });
           }
         }

@@ -1,26 +1,27 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import './App.css';
+import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
+import "./App.css";
 
 // Check if running in Electron
-const isElectron = window && window.process && window.process.type === 'renderer';
+const isElectron =
+  window && window.process && window.process.type === "renderer";
 
 function App() {
-  const [text, setText] = useState('');
+  const [text, setText] = useState("");
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [alert, setAlert] = useState({ show: false, type: '', message: '' });
+  const [alert, setAlert] = useState({ show: false, type: "", message: "" });
   const [messages, setMessages] = useState([]);
-  
+
   // Preset lists
   const [textPresets, setTextPresets] = useState([]);
   const [imagePresets, setImagePresets] = useState([]);
   const [sendingPresets, setSendingPresets] = useState(false);
   const textAreaRef = useRef(null);
-  
+
   // Clipboard monitoring (Electron only)
   const [showClipboardHistory, setShowClipboardHistory] = useState(false);
   const [clipboardHistory, setClipboardHistory] = useState([]);
@@ -28,33 +29,38 @@ function App() {
   useEffect(() => {
     fetchMessages();
     loadPresetsFromStorage();
-    
+
     // Setup Electron IPC listeners
     if (isElectron && window.require) {
-      const { ipcRenderer } = window.require('electron');
-      
+      const { ipcRenderer } = window.require("electron");
+
       // Listen for clipboard updates
-      ipcRenderer.on('clipboard-update', (event, data) => {
-        console.log('Clipboard updated:', data);
-        showAlert('info', `Clipboard: ${data.type === 'text' ? data.content.substring(0, 30) : 'Image'}`);
+      ipcRenderer.on("clipboard-update", (event, data) => {
+        console.log("Clipboard updated:", data);
+        showAlert(
+          "info",
+          `Clipboard: ${
+            data.type === "text" ? data.content.substring(0, 30) : "Image"
+          }`
+        );
       });
-      
+
       // Listen for clipboard history request
-      ipcRenderer.on('show-clipboard-history', () => {
+      ipcRenderer.on("show-clipboard-history", () => {
         setShowClipboardHistory(true);
         // Request clipboard history from main process
-        ipcRenderer.send('get-clipboard-history');
+        ipcRenderer.send("get-clipboard-history");
       });
-      
+
       // Receive clipboard history
-      ipcRenderer.on('clipboard-history-response', (event, history) => {
+      ipcRenderer.on("clipboard-history-response", (event, history) => {
         setClipboardHistory(history);
       });
-      
+
       return () => {
-        ipcRenderer.removeAllListeners('clipboard-update');
-        ipcRenderer.removeAllListeners('show-clipboard-history');
-        ipcRenderer.removeAllListeners('clipboard-history-response');
+        ipcRenderer.removeAllListeners("clipboard-update");
+        ipcRenderer.removeAllListeners("show-clipboard-history");
+        ipcRenderer.removeAllListeners("clipboard-history-response");
       };
     }
   }, []);
@@ -62,9 +68,9 @@ function App() {
   // Load presets from localStorage
   const loadPresetsFromStorage = () => {
     try {
-      const savedTextPresets = localStorage.getItem('textPresets');
-      const savedImagePresets = localStorage.getItem('imagePresets');
-      
+      const savedTextPresets = localStorage.getItem("textPresets");
+      const savedImagePresets = localStorage.getItem("imagePresets");
+
       if (savedTextPresets) {
         setTextPresets(JSON.parse(savedTextPresets));
       }
@@ -72,17 +78,17 @@ function App() {
         setImagePresets(JSON.parse(savedImagePresets));
       }
     } catch (error) {
-      console.error('Error loading presets:', error);
+      console.error("Error loading presets:", error);
     }
   };
 
   // Save presets to localStorage
   const savePresetsToStorage = (texts, images) => {
     try {
-      localStorage.setItem('textPresets', JSON.stringify(texts));
-      localStorage.setItem('imagePresets', JSON.stringify(images));
+      localStorage.setItem("textPresets", JSON.stringify(texts));
+      localStorage.setItem("imagePresets", JSON.stringify(images));
     } catch (error) {
-      console.error('Error saving presets:', error);
+      console.error("Error saving presets:", error);
     }
   };
 
@@ -93,40 +99,40 @@ function App() {
       if (!items) return;
 
       for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
+        if (items[i].type.indexOf("image") !== -1) {
           const blob = items[i].getAsFile();
           if (blob) {
-            setImages(prev => [...prev, blob]);
+            setImages((prev) => [...prev, blob]);
             const reader = new FileReader();
             reader.onloadend = () => {
-              setImagePreviews(prev => [...prev, reader.result]);
+              setImagePreviews((prev) => [...prev, reader.result]);
             };
             reader.readAsDataURL(blob);
-            showAlert('success', 'Image pasted from clipboard!');
+            showAlert("success", "Image pasted from clipboard!");
           }
         }
       }
     };
 
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
   }, []);
 
   const fetchMessages = async () => {
     try {
-      const response = await axios.get('/api/messages');
+      const response = await axios.get("/api/messages");
       if (response.data.success) {
         setMessages(response.data.messages);
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error("Error fetching messages:", error);
     }
   };
 
   const showAlert = (type, message) => {
     setAlert({ show: true, type, message });
     setTimeout(() => {
-      setAlert({ show: false, type: '', message: '' });
+      setAlert({ show: false, type: "", message: "" });
     }, 5000);
   };
 
@@ -137,9 +143,9 @@ function App() {
     const validFiles = [];
     const previews = [];
 
-    files.forEach(file => {
+    files.forEach((file) => {
       if (file.size > 10 * 1024 * 1024) {
-        showAlert('error', `${file.name} exceeds 10MB limit`);
+        showAlert("error", `${file.name} exceeds 10MB limit`);
         return;
       }
 
@@ -148,8 +154,8 @@ function App() {
       reader.onloadend = () => {
         previews.push(reader.result);
         if (previews.length === validFiles.length) {
-          setImages(prevImages => [...prevImages, ...validFiles]);
-          setImagePreviews(prevPreviews => [...prevPreviews, ...previews]);
+          setImages((prevImages) => [...prevImages, ...validFiles]);
+          setImagePreviews((prevPreviews) => [...prevPreviews, ...previews]);
         }
       };
       reader.readAsDataURL(file);
@@ -157,8 +163,10 @@ function App() {
   };
 
   const removeImage = (index) => {
-    setImages(prevImages => prevImages.filter((_, i) => i !== index));
-    setImagePreviews(prevPreviews => prevPreviews.filter((_, i) => i !== index));
+    setImages((prevImages) => prevImages.filter((_, i) => i !== index));
+    setImagePreviews((prevPreviews) =>
+      prevPreviews.filter((_, i) => i !== index)
+    );
   };
 
   const removeAllImages = () => {
@@ -170,7 +178,7 @@ function App() {
     e.preventDefault();
 
     if (!text.trim() && images.length === 0) {
-      showAlert('error', 'Please enter text or select images');
+      showAlert("error", "Please enter text or select images");
       return;
     }
 
@@ -178,28 +186,35 @@ function App() {
 
     try {
       const formData = new FormData();
-      formData.append('text', text.trim() || 'Multiple images');
-      
+      formData.append("text", text.trim() || "Multiple images");
+
       // Add all images to the same request
       images.forEach((img) => {
-        formData.append('images', img);
+        formData.append("images", img);
       });
 
-      await axios.post('/api/messages', formData, {
+      await axios.post("/api/messages", formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
       });
 
-      showAlert('success', `Successfully stored ${text.trim() ? '1 text + ' : ''}${images.length} image(s)!`);
-      setText('');
+      showAlert(
+        "success",
+        `Successfully stored ${text.trim() ? "1 text + " : ""}${
+          images.length
+        } image(s)!`
+      );
+      setText("");
       setImages([]);
       setImagePreviews([]);
       fetchMessages();
     } catch (error) {
-      console.error('Error storing message:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to store message. Please try again.';
-      showAlert('error', errorMessage);
+      console.error("Error storing message:", error);
+      const errorMessage =
+        error.response?.data?.error ||
+        "Failed to store message. Please try again.";
+      showAlert("error", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -208,27 +223,33 @@ function App() {
   // Add current text/image to preset lists
   const addToPresets = () => {
     if (!text.trim() && images.length === 0) {
-      showAlert('error', 'Please enter text or select images to add to presets');
+      showAlert(
+        "error",
+        "Please enter text or select images to add to presets"
+      );
       return;
     }
 
     const newTextPresets = text.trim() ? [...textPresets, text] : textPresets;
     let newImagePresets = [...imagePresets];
-    
+
     images.forEach((img, index) => {
-      newImagePresets.push({ 
-        name: img.name, 
-        preview: imagePreviews[index], 
-        file: img 
+      newImagePresets.push({
+        name: img.name,
+        preview: imagePreviews[index],
+        file: img,
       });
     });
 
     setTextPresets(newTextPresets);
     setImagePresets(newImagePresets);
-    savePresetsToStorage(newTextPresets, newImagePresets.map(img => ({ name: img.name, preview: img.preview })));
+    savePresetsToStorage(
+      newTextPresets,
+      newImagePresets.map((img) => ({ name: img.name, preview: img.preview }))
+    );
 
-    showAlert('success', 'Added to presets!');
-    setText('');
+    showAlert("success", "Added to presets!");
+    setText("");
     setImages([]);
     setImagePreviews([]);
   };
@@ -237,30 +258,36 @@ function App() {
   const removeTextPreset = (index) => {
     const newPresets = textPresets.filter((_, i) => i !== index);
     setTextPresets(newPresets);
-    savePresetsToStorage(newPresets, imagePresets.map(img => ({ name: img.name, preview: img.preview })));
+    savePresetsToStorage(
+      newPresets,
+      imagePresets.map((img) => ({ name: img.name, preview: img.preview }))
+    );
   };
 
   const removeImagePreset = (index) => {
     const newPresets = imagePresets.filter((_, i) => i !== index);
     setImagePresets(newPresets);
-    savePresetsToStorage(textPresets, newPresets.map(img => ({ name: img.name, preview: img.preview })));
+    savePresetsToStorage(
+      textPresets,
+      newPresets.map((img) => ({ name: img.name, preview: img.preview }))
+    );
   };
 
   // Send single text preset
   const sendSingleTextPreset = async (textMsg, index) => {
     try {
       const formData = new FormData();
-      formData.append('text', textMsg);
+      formData.append("text", textMsg);
 
-      await axios.post('/api/messages', formData);
-      showAlert('success', 'Message stored successfully!');
-      
+      await axios.post("/api/messages", formData);
+      showAlert("success", "Message stored successfully!");
+
       // Remove from presets after successful send
       removeTextPreset(index);
       fetchMessages();
     } catch (error) {
-      console.error('Error storing text preset:', error);
-      showAlert('error', 'Failed to store message');
+      console.error("Error storing text preset:", error);
+      showAlert("error", "Failed to store message");
     }
   };
 
@@ -268,17 +295,17 @@ function App() {
   const copySingleText = async (textMsg) => {
     try {
       await navigator.clipboard.writeText(textMsg);
-      showAlert('success', '✅ Text copied to clipboard!');
+      showAlert("success", "✅ Text copied to clipboard!");
     } catch (error) {
-      console.error('Failed to copy:', error);
-      showAlert('error', 'Failed to copy');
+      console.error("Failed to copy:", error);
+      showAlert("error", "Failed to copy");
     }
   };
 
   // Paste single text to current text field
   const pasteSingleText = (textMsg) => {
     setText(textMsg);
-    showAlert('success', '✅ Text pasted to input field!');
+    showAlert("success", "✅ Text pasted to input field!");
     if (textAreaRef.current) {
       textAreaRef.current.focus();
     }
@@ -288,26 +315,26 @@ function App() {
   const sendSingleImagePreset = async (imgData, index) => {
     try {
       const formData = new FormData();
-      formData.append('text', imgData.name || 'Image');
-      
+      formData.append("text", imgData.name || "Image");
+
       // Convert data URL back to blob if needed
       if (imgData.file) {
-        formData.append('images', imgData.file);
+        formData.append("images", imgData.file);
       } else if (imgData.preview) {
         const response = await fetch(imgData.preview);
         const blob = await response.blob();
-        formData.append('images', blob, imgData.name);
+        formData.append("images", blob, imgData.name);
       }
 
-      await axios.post('/api/messages', formData);
-      showAlert('success', 'Image stored successfully!');
-      
+      await axios.post("/api/messages", formData);
+      showAlert("success", "Image stored successfully!");
+
       // Remove from presets after successful send
       removeImagePreset(index);
       fetchMessages();
     } catch (error) {
-      console.error('Error storing image preset:', error);
-      showAlert('error', 'Failed to store image');
+      console.error("Error storing image preset:", error);
+      showAlert("error", "Failed to store image");
     }
   };
 
@@ -316,38 +343,38 @@ function App() {
     try {
       // Copy actual image data to clipboard (Electron only)
       if (isElectron && window.require) {
-        const { ipcRenderer } = window.require('electron');
-        ipcRenderer.send('copy-to-clipboard', {
-          type: 'image',
-          content: imgData.preview // Send the data URL
+        const { ipcRenderer } = window.require("electron");
+        ipcRenderer.send("copy-to-clipboard", {
+          type: "image",
+          content: imgData.preview, // Send the data URL
         });
-        showAlert('success', '✅ Image copied to clipboard!');
+        showAlert("success", "✅ Image copied to clipboard!");
       } else {
         // Fallback for web - copy image name
         await navigator.clipboard.writeText(imgData.name);
-        showAlert('success', '✅ Image name copied to clipboard!');
+        showAlert("success", "✅ Image name copied to clipboard!");
       }
     } catch (error) {
-      console.error('Failed to copy:', error);
-      showAlert('error', 'Failed to copy');
+      console.error("Failed to copy:", error);
+      showAlert("error", "Failed to copy");
     }
   };
 
   // Paste single image to current image field
   const pasteSingleImage = (imgData) => {
     if (imgData.file) {
-      setImages(prev => [...prev, imgData.file]);
-      setImagePreviews(prev => [...prev, imgData.preview]);
-      showAlert('success', '✅ Image pasted to input field!');
+      setImages((prev) => [...prev, imgData.file]);
+      setImagePreviews((prev) => [...prev, imgData.preview]);
+      showAlert("success", "✅ Image pasted to input field!");
     } else {
-      showAlert('error', 'Image file not available');
+      showAlert("error", "Image file not available");
     }
   };
 
   // Send all presets
   const sendAllPresets = async () => {
     if (textPresets.length === 0 && imagePresets.length === 0) {
-      showAlert('error', 'No presets to store');
+      showAlert("error", "No presets to store");
       return;
     }
 
@@ -360,13 +387,13 @@ function App() {
       for (const textMsg of textPresets) {
         try {
           const formData = new FormData();
-          formData.append('text', textMsg);
+          formData.append("text", textMsg);
 
-          await axios.post('/api/messages', formData);
+          await axios.post("/api/messages", formData);
           successCount++;
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between messages
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second between messages
         } catch (error) {
-          console.error('Error storing text preset:', error);
+          console.error("Error storing text preset:", error);
           failCount++;
         }
       }
@@ -375,38 +402,43 @@ function App() {
       for (const imageData of imagePresets) {
         try {
           const formData = new FormData();
-          formData.append('text', imageData.name || 'Image');
-          
+          formData.append("text", imageData.name || "Image");
+
           // Convert data URL back to blob if needed
           if (imageData.file) {
-            formData.append('images', imageData.file);
+            formData.append("images", imageData.file);
           } else if (imageData.preview) {
             const response = await fetch(imageData.preview);
             const blob = await response.blob();
-            formData.append('images', blob, imageData.name);
+            formData.append("images", blob, imageData.name);
           }
 
-          await axios.post('/api/messages', formData);
+          await axios.post("/api/messages", formData);
           successCount++;
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between messages
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second between messages
         } catch (error) {
-          console.error('Error storing image preset:', error);
+          console.error("Error storing image preset:", error);
           failCount++;
         }
       }
 
-      showAlert('success', `Stored ${successCount} messages successfully${failCount > 0 ? `, ${failCount} failed` : ''}!`);
-      
+      showAlert(
+        "success",
+        `Stored ${successCount} messages successfully${
+          failCount > 0 ? `, ${failCount} failed` : ""
+        }!`
+      );
+
       // Clear presets after successful send
       if (failCount === 0) {
         setTextPresets([]);
         setImagePresets([]);
         savePresetsToStorage([], []);
       }
-      
+
       fetchMessages();
     } catch (error) {
-      showAlert('error', 'Error storing presets');
+      showAlert("error", "Error storing presets");
     } finally {
       setSendingPresets(false);
     }
@@ -417,23 +449,23 @@ function App() {
     setTextPresets([]);
     setImagePresets([]);
     savePresetsToStorage([], []);
-    showAlert('info', 'All presets cleared');
+    showAlert("info", "All presets cleared");
   };
 
   // Copy all presets to clipboard
   const copyPresetsToClipboard = async () => {
     if (textPresets.length === 0 && imagePresets.length === 0) {
-      showAlert('error', 'No presets to copy');
+      showAlert("error", "No presets to copy");
       return;
     }
 
-    let clipboardText = '';
-    
+    let clipboardText = "";
+
     // Add text messages (one per line)
     textPresets.forEach((text) => {
       clipboardText += `${text}\n`;
     });
-    
+
     // Add image names
     imagePresets.forEach((img) => {
       clipboardText += `${img.name}\n`;
@@ -441,10 +473,10 @@ function App() {
 
     try {
       await navigator.clipboard.writeText(clipboardText.trim());
-      showAlert('success', '✅ Copied to clipboard! Paste in notepad or blog.');
+      showAlert("success", "✅ Copied to clipboard! Paste in notepad or blog.");
     } catch (error) {
-      console.error('Failed to copy:', error);
-      showAlert('error', 'Failed to copy to clipboard');
+      console.error("Failed to copy:", error);
+      showAlert("error", "Failed to copy to clipboard");
     }
   };
 
@@ -456,9 +488,7 @@ function App() {
       </header>
 
       {alert.show && (
-        <div className={`alert alert-${alert.type}`}>
-          {alert.message}
-        </div>
+        <div className={`alert alert-${alert.type}`}>{alert.message}</div>
       )}
 
       <form className="messenger-form" onSubmit={handleSubmit}>
@@ -477,8 +507,16 @@ function App() {
         <div className="form-group">
           <label>Image (optional)</label>
           <div className="file-input-wrapper">
-            <label className={`file-input-label ${images.length > 0 ? 'has-file' : ''}`} htmlFor="image">
-              📷 {images.length > 0 ? `${images.length} Image(s) Selected` : 'Choose Images (Multiple)'}
+            <label
+              className={`file-input-label ${
+                images.length > 0 ? "has-file" : ""
+              }`}
+              htmlFor="image"
+            >
+              📷{" "}
+              {images.length > 0
+                ? `${images.length} Image(s) Selected`
+                : "Choose Images (Multiple)"}
             </label>
             <input
               type="file"
@@ -490,7 +528,7 @@ function App() {
           </div>
           {images.length > 0 && (
             <div className="file-name">
-              Selected: {images.map(img => img.name).join(', ')}
+              Selected: {images.map((img) => img.name).join(", ")}
             </div>
           )}
         </div>
@@ -501,9 +539,9 @@ function App() {
               {imagePreviews.map((preview, index) => (
                 <div key={index} className="image-preview-item">
                   <img src={preview} alt={`Preview ${index + 1}`} />
-                  <button 
-                    type="button" 
-                    className="remove-single-image" 
+                  <button
+                    type="button"
+                    className="remove-single-image"
                     onClick={() => removeImage(index)}
                   >
                     ✕
@@ -511,7 +549,11 @@ function App() {
                 </div>
               ))}
             </div>
-            <button type="button" className="remove-image" onClick={removeAllImages}>
+            <button
+              type="button"
+              className="remove-image"
+              onClick={removeAllImages}
+            >
               Remove All Images
             </button>
           </div>
@@ -519,10 +561,15 @@ function App() {
 
         <button type="submit" className="submit-btn" disabled={loading}>
           {loading && <span className="loading-spinner"></span>}
-          {loading ? 'Storing...' : '💾 Store Message'}
+          {loading ? "Storing..." : "💾 Store Message"}
         </button>
 
-        <button type="button" className="preset-btn" onClick={addToPresets} disabled={loading}>
+        <button
+          type="button"
+          className="preset-btn"
+          onClick={addToPresets}
+          disabled={loading}
+        >
           ➕ Add to Presets
         </button>
       </form>
@@ -533,19 +580,23 @@ function App() {
           <div className="presets-header">
             <h2>📋 Saved Presets (Offline Mode)</h2>
             <div className="presets-actions">
-              <button 
-                className="copy-clipboard-btn" 
+              <button
+                className="copy-clipboard-btn"
                 onClick={copyPresetsToClipboard}
               >
                 📋 Copy to Clipboard
               </button>
-              <button 
-                className="send-all-btn" 
-                onClick={sendAllPresets} 
+              <button
+                className="send-all-btn"
+                onClick={sendAllPresets}
                 disabled={sendingPresets}
               >
                 {sendingPresets && <span className="loading-spinner"></span>}
-                {sendingPresets ? 'Storing All...' : `💾 Store All (${textPresets.length + imagePresets.length})`}
+                {sendingPresets
+                  ? "Storing All..."
+                  : `💾 Store All (${
+                      textPresets.length + imagePresets.length
+                    })`}
               </button>
               <button className="clear-all-btn" onClick={clearAllPresets}>
                 🗑️ Clear All
@@ -560,28 +611,28 @@ function App() {
                 <div key={index} className="preset-item">
                   <span className="preset-text">{textMsg}</span>
                   <div className="preset-actions">
-                    <button 
-                      className="copy-preset-btn" 
+                    <button
+                      className="copy-preset-btn"
                       onClick={() => copySingleText(textMsg)}
                       title="Copy to clipboard"
                     >
                       📋
                     </button>
-                    <button 
-                      className="paste-preset-btn" 
+                    <button
+                      className="paste-preset-btn"
                       onClick={() => pasteSingleText(textMsg)}
                       title="Paste to input field"
                     >
                       📝
                     </button>
-                    <button 
-                      className="send-preset-btn" 
+                    <button
+                      className="send-preset-btn"
                       onClick={() => sendSingleTextPreset(textMsg, index)}
                     >
                       💾 Store
                     </button>
-                    <button 
-                      className="remove-preset-btn" 
+                    <button
+                      className="remove-preset-btn"
                       onClick={() => removeTextPreset(index)}
                     >
                       ✕
@@ -601,29 +652,29 @@ function App() {
                     <img src={imgData.preview} alt={imgData.name} />
                     <span className="image-preset-name">{imgData.name}</span>
                     <div className="image-preset-actions">
-                      <button 
-                        className="copy-preset-btn-small" 
+                      <button
+                        className="copy-preset-btn-small"
                         onClick={() => copySingleImage(imgData)}
                         title="Copy name"
                       >
                         📋
                       </button>
-                      <button 
-                        className="paste-preset-btn-small" 
+                      <button
+                        className="paste-preset-btn-small"
                         onClick={() => pasteSingleImage(imgData)}
                         title="Paste to input"
                       >
                         📝
                       </button>
-                      <button 
-                        className="send-preset-btn-small" 
+                      <button
+                        className="send-preset-btn-small"
                         onClick={() => sendSingleImagePreset(imgData, index)}
                         title="Store"
                       >
                         💾
                       </button>
-                      <button 
-                        className="remove-preset-btn" 
+                      <button
+                        className="remove-preset-btn"
                         onClick={() => removeImagePreset(index)}
                         title="Remove"
                       >
@@ -640,12 +691,15 @@ function App() {
 
       {/* Clipboard History Modal (Electron only) */}
       {isElectron && showClipboardHistory && (
-        <div className="modal-overlay" onClick={() => setShowClipboardHistory(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowClipboardHistory(false)}
+        >
           <div className="clipboard-modal" onClick={(e) => e.stopPropagation()}>
             <div className="clipboard-modal-header">
               <h2>📋 Clipboard History</h2>
-              <button 
-                className="close-modal-btn" 
+              <button
+                className="close-modal-btn"
                 onClick={() => setShowClipboardHistory(false)}
               >
                 ✕
@@ -657,7 +711,7 @@ function App() {
               ) : (
                 clipboardHistory.map((item, index) => (
                   <div key={index} className="clipboard-history-item">
-                    {item.type === 'text' ? (
+                    {item.type === "text" ? (
                       <>
                         <span className="clipboard-type-badge">Text</span>
                         <div className="clipboard-content">{item.content}</div>
@@ -665,9 +719,9 @@ function App() {
                     ) : (
                       <>
                         <span className="clipboard-type-badge">Image</span>
-                        <img 
-                          src={item.preview} 
-                          alt="Clipboard" 
+                        <img
+                          src={item.preview}
+                          alt="Clipboard"
                           className="clipboard-image-preview"
                         />
                       </>
@@ -690,18 +744,22 @@ function App() {
             <div key={msg._id} className="message-item">
               <div>
                 <strong>{msg.text}</strong>
-                <span className={`message-status ${msg.status}`}>{msg.status}</span>
+                <span className={`message-status ${msg.status}`}>
+                  {msg.status}
+                </span>
               </div>
               {msg.imageUrl && (
-                <div style={{ marginTop: '10px' }}>
-                  <img 
-                    src={`http://localhost:5000${msg.imageUrl}`} 
-                    alt="Message attachment" 
-                    style={{ maxWidth: '200px', borderRadius: '8px' }}
+                <div style={{ marginTop: "10px" }}>
+                  <img
+                    src={`http://localhost:5000${msg.imageUrl}`}
+                    alt="Message attachment"
+                    style={{ maxWidth: "200px", borderRadius: "8px" }}
                   />
                 </div>
               )}
-              <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '8px' }}>
+              <div
+                style={{ fontSize: "0.85rem", color: "#666", marginTop: "8px" }}
+              >
                 {new Date(msg.createdAt).toLocaleString()}
               </div>
             </div>

@@ -54,19 +54,29 @@
       "node_modules/**/*",
       "public/electron.js"
     ],
+    "extraMetadata": {
+      "main": "public/electron.js"
+    },
     "directories": {
       "buildResources": "public"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "public/logo192.png"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "public/logo192.png"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "public/logo192.png",
       "category": "Utility"
     }

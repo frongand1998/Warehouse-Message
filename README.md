@@ -1,6 +1,6 @@
 # Warehouse Message
 
-A cross-platform desktop application (Electron + MERN stack) that sends messages to Facebook Messenger with system-wide clipboard monitoring across all applications.
+A cross-platform desktop application (Electron + React) for clipboard monitoring and message management.
 
 ## ✨ Key Features
 
@@ -17,15 +17,15 @@ A cross-platform desktop application (Electron + MERN stack) that sends messages
 - **History storage**: Up to 50 recent items
 - **Real-time notifications**: Alerts on clipboard changes
 
-### 📱 Facebook Messenger Integration
-- **Text messages**: Send formatted text to Messenger
-- **Multiple images**: Upload and send multiple images at once
-- **Batch operations**: Send all presets sequentially
-- **Status tracking**: Real-time delivery confirmation
+### 💼 Message Management
+- **Store messages**: Save text and images
+- **Quick access**: View stored messages anytime
+- **Offline storage**: Works without internet
+- **Persistent**: Survives app restarts
 
-### 💼 Preset Management
+### 💾 Preset Management
 - **Offline storage**: Save frequently used content (localStorage)
-- **Quick send**: One-click sending of saved items
+- **Quick send**: One-click access to saved items
 - **Copy/Paste**: Individual item clipboard operations
 - **Persistent**: Survives app restarts
 
@@ -72,79 +72,14 @@ npm run electron-dev
 
 - **Desktop Framework**: Electron (cross-platform desktop apps)
 - **Frontend**: React.js 18.2.0
-- **Backend**: Node.js + Express.js
-- **Database**: MongoDB (optional, works without it)
-- **API**: Facebook Graph API (Messenger Send API)
+- **Backend**: Node.js + Express.js (simple API server)
+- **Storage**: localStorage + in-memory
 - **Build Tool**: electron-builder
 
-## Prerequisites
+## 📋 Prerequisites
 
-Before you begin, ensure you have the following installed:
 - Node.js (v14 or higher)
-- MongoDB (optional - running locally or MongoDB Atlas)
-- A Facebook Page and App with Messenger enabled
-
-## Facebook Setup
-
-### Step 1: Create a Facebook Page (if you don't have one)
-1. Go to [Facebook Pages](https://www.facebook.com/pages/creation/)
-2. Create a new page for your business/project
-3. Complete the page setup
-
-### Step 2: Create a Facebook App
-1. Go to [Facebook Developers](https://developers.facebook.com/)
-2. Click "My Apps" → "Create App"
-3. Select "Business" as the app type
-4. Fill in your app details (name, contact email)
-5. Click "Create App"
-
-### Step 3: Add Messenger Product
-1. In your app dashboard, find "Add Products" section
-2. Locate "Messenger" and click "Set Up"
-3. Scroll down to "Access Tokens" section
-
-### Step 4: Generate a Page Access Token
-1. In the Messenger settings, find "Access Tokens" section
-2. Click "Add or Remove Pages"
-3. Select the Facebook Page you want to use
-4. Grant the required permissions
-5. Your Page Access Token will appear - **copy this token**
-6. This token is needed for your `.env` file as `FACEBOOK_PAGE_ACCESS_TOKEN`
-
-**Important Notes:**
-- Page Access Tokens can expire. For production, generate a long-lived token
-- To generate a long-lived token, use the [Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken/)
-- Keep your token secure and never commit it to version control
-
-### Step 5: Get the Recipient PSID (Page-Scoped ID)
-
-**⚠️ Important:** You cannot read conversations without special permissions that require Facebook App Review. Instead, use the webhook method below:
-
-**Method 1: Using Webhook (Recommended & Easiest)**
-1. Make sure your server is running and accessible from the internet (use ngrok for local testing)
-2. In Facebook Developers, go to your app → Messenger → Settings
-3. Scroll to "Webhooks" section
-4. Click "Add Callback URL"
-5. Enter your webhook URL: `https://your-domain.com/api/messenger/webhook`
-   - For local testing with ngrok: `https://xxxx.ngrok.io/api/messenger/webhook`
-6. Enter the verify token from your `.env` file (default: `my_webhook_token_123`)
-7. Subscribe to webhook fields: `messages`, `messaging_postbacks`
-8. **Send a message to your Facebook Page from your personal account**
-9. Check your server console logs - you'll see the PSID printed:
-   ```
-   📩 Message received from PSID: 1234567890
-   👉 Use this as your RECIPIENT_ID in .env file!
-   ```
-10. Copy that PSID and add it to your `.env` file
-
-**Method 2: Use Your Own User ID (Quick Test)**
-- You can try using your Facebook User ID (`25189818513994127` from your access token info)
-- This might work for testing, but the actual PSID from the webhook is more reliable
-
-**Method 3: For Production**
-- Set up the webhook as described in Method 1
-- When users message your page, store their PSIDs in your database
-- Use those PSIDs to send messages back to specific users
+- npm or yarn
 
 ## Installation
 
@@ -160,22 +95,16 @@ cd server
 npm install
 ```
 
-3. Create a `.env` file from the example:
+3. Create a `.env` file from the example (optional):
 ```bash
 cp .env.example .env
 ```
 
-4. Edit `.env` and add your credentials:
+4. Configure environment variables (optional):
 ```
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/warehouse-message
-FACEBOOK_PAGE_ACCESS_TOKEN=your_page_access_token_here
-FACEBOOK_PAGE_ID=your_page_id_here
-RECIPIENT_ID=your_recipient_psid_here
-WEBHOOK_VERIFY_TOKEN=my_webhook_token_123
+MONGODB_URI=mongodb://localhost:27017/warehouse-message  # Optional: for persistent storage
 ```
-
-**Note:** You'll get the RECIPIENT_ID after setting up the webhook (see Facebook Setup section)
 
 5. Start the backend server:
 ```bash
@@ -203,50 +132,46 @@ The app will open at `http://localhost:3000`
 
 ## Usage
 
-1. Open the web app in your browser
-2. Enter your message text (required)
-3. Optionally upload an image (JPEG, PNG, or GIF, max 10MB)
-4. Optionally enter a specific recipient PSID (otherwise uses the default from .env)
-5. Click "Send to Messenger"
-6. View the message history below the form
+1. Open the desktop app
+2. Use the clipboard monitoring feature to track copied content
+3. View clipboard history with `Ctrl+Shift+V` (or `Cmd+Shift+V`)
+4. Store important messages for later access
+5. Manage presets for frequently used content
+6. Toggle window with `Ctrl+Shift+W` (or `Cmd+Shift+W`)
 
 ## API Endpoints
 
-### POST `/api/messenger/send`
-Send a message with optional image to Facebook Messenger
+### POST `/api/messages`
+Store a message with optional images
 
 **Request:**
 - `text` (string, required): Message text
-- `image` (file, optional): Image file
-- `recipientId` (string, optional): Recipient PSID
+- `images` (files, optional): Up to 10 image files
 
 **Response:**
 ```json
 {
   "success": true,
-  "message": "Message sent successfully",
+  "message": "Message stored successfully",
   "data": {
-    "messageId": "...",
-    "recipientId": "...",
+    "id": "...",
     "text": "...",
-    "imageUrl": "..."
+    "images": [...]
   }
 }
 ```
 
-### GET `/api/messenger/messages`
-Get recent messages
+### GET `/api/messages`
+Get recent messages (last 50)
 
 **Response:**
 ```json
 {
   "success": true,
+  "count": 10,
   "messages": [...]
 }
 ```
-
-### GET `/api/messenger/messages/:id`
-Get a specific message by ID
 
 ## Project Structure
 
@@ -254,14 +179,12 @@ Get a specific message by ID
 Warehouse-Message/
 ├── server/
 │   ├── models/
-│   │   └── Message.js
-│   ├── routes/
-│   │   └── messenger.js
-│   ├── uploads/
+│   │   └── Message.js       # MongoDB schema (optional)
+│   ├── uploads/             # Uploaded images storage
 │   ├── .env.example
 │   ├── .gitignore
 │   ├── package.json
-│   └── server.js
+│   └── server.js            # Express API server
 ├── client/
 │   ├── public/
 │   │   ├── electron.js       # Electron main process
@@ -356,19 +279,17 @@ npm run dist
 
 Deploy the Express server to production:
 
-**Quick Deploy (Heroku):**
+**Quick Deploy (Vercel):**
 ```bash
 cd server
-heroku create warehouse-message-server
-heroku config:set FACEBOOK_PAGE_ACCESS_TOKEN=xxx
-heroku config:set FACEBOOK_PAGE_ID=xxx
-heroku config:set RECIPIENT_ID=xxx
-git init && git add . && git commit -m "Deploy"
-git push heroku main
+# Deploy via Vercel dashboard at vercel.com
+# Set root directory to "server"
+# No environment variables required
 ```
 
 **Other Options:**
 - Railway.app (easiest)
+- Heroku
 - DigitalOcean VPS with PM2
 - AWS EC2
 - Your own server
@@ -398,15 +319,11 @@ git push heroku main
 - **Global shortcuts not responding**: Another app might be using same shortcuts
 - **Tray icon missing**: Verify `public/favicon.ico` exists
 
-### Facebook API Errors
-- **Error 190 (Invalid Token)**: Check `FACEBOOK_PAGE_ACCESS_TOKEN` in `.env`
-- **Error 100 (Invalid Recipient)**: Use webhook method to get correct PSID
-- **Image upload failed**: Ensure image is under 10MB and in supported format (JPEG/PNG/GIF)
-
 ### Server Issues
 - **Port already in use**: Kill existing process on port 5000 or 3000
 - **MongoDB errors**: MongoDB is optional - app works without it
 - **CORS errors**: Check proxy setting in `client/package.json`
+- **Image upload failed**: Ensure image is in supported format (JPEG/PNG/GIF)
 
 📖 Detailed troubleshooting: [TEST_GUIDE.md](TEST_GUIDE.md)
 
@@ -427,8 +344,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🙏 Acknowledgments
 
 - Built with [Electron](https://www.electronjs.org/)
-- React framework by Facebook
-- Facebook Messenger API
+- React framework
 - electron-builder for packaging
 
 ## 📧 Support
@@ -440,4 +356,4 @@ For issues or questions:
 
 ---
 
-**Made with ❤️ for easier Facebook Messenger communication**
+**Made with ❤️ for efficient clipboard management**

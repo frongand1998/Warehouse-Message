@@ -314,8 +314,19 @@ function App() {
   // Copy image name to clipboard
   const copySingleImage = async (imgData) => {
     try {
-      await navigator.clipboard.writeText(imgData.name);
-      showAlert('success', '✅ Image name copied to clipboard!');
+      // Copy actual image data to clipboard (Electron only)
+      if (isElectron && window.require) {
+        const { ipcRenderer } = window.require('electron');
+        ipcRenderer.send('copy-to-clipboard', {
+          type: 'image',
+          content: imgData.preview // Send the data URL
+        });
+        showAlert('success', '✅ Image copied to clipboard!');
+      } else {
+        // Fallback for web - copy image name
+        await navigator.clipboard.writeText(imgData.name);
+        showAlert('success', '✅ Image name copied to clipboard!');
+      }
     } catch (error) {
       console.error('Failed to copy:', error);
       showAlert('error', 'Failed to copy');

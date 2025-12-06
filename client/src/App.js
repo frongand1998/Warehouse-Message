@@ -1,18 +1,116 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
+
+// Check if running in Electron
+const isElectron = window && window.process && window.process.type === 'renderer';
 
 function App() {
   const [text, setText] = useState('');
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [images, setImages] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [recipientId, setRecipientId] = useState('');
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState({ show: false, type: '', message: '' });
   const [messages, setMessages] = useState([]);
+  
+  // Preset lists
+  const [textPresets, setTextPresets] = useState([]);
+  const [imagePresets, setImagePresets] = useState([]);
+  const [sendingPresets, setSendingPresets] = useState(false);
+  const textAreaRef = useRef(null);
+  
+  // Clipboard monitoring (Electron only)
+  const [showClipboardHistory, setShowClipboardHistory] = useState(false);
+  const [clipboardHistory, setClipboardHistory] = useState([]);
 
   useEffect(() => {
     fetchMessages();
+    loadPresetsFromStorage();
+    
+    // Setup Electron IPC listeners
+    if (isElectron && window.require) {
+      const { ipcRenderer } = window.require('electron');
+      
+      // Listen for clipboard updates
+      ipcRenderer.on('clipboard-update', (event, data) => {
+        console.log('Clipboard updated:', data);
+        showAlert('info', `Clipboard: ${data.type === 'text' ? data.content.substring(0, 30) : 'Image'}`);
+      });
+      
+      // Listen for clipboard history request
+      ipcRenderer.on('show-clipboard-history', () => {
+        setShowClipboardHistory(true);
+        // Request clipboard history from main process
+        ipcRenderer.send('get-clipboard-history');
+      });
+      
+      // Receive clipboard history
+      ipcRenderer.on('clipboard-history-response', (event, history) => {
+        setClipboardHistory(history);
+      });
+      
+      return () => {
+        ipcRenderer.removeAllListeners('clipboard-update');
+        ipcRenderer.removeAllListeners('show-clipboard-history');
+        ipcRenderer.removeAllListeners('clipboard-history-response');
+      };
+    }
+  }, []);
+
+  // Load presets from localStorage
+  const loadPresetsFromStorage = () => {
+    try {
+      const savedTextPresets = localStorage.getItem('textPresets');
+      const savedImagePresets = localStorage.getItem('imagePresets');
+      
+      if (savedTextPresets) {
+        setTextPresets(JSON.parse(savedTextPresets));
+      }
+      if (savedImagePresets) {
+        setImagePresets(JSON.parse(savedImagePresets));
+      }
+    } catch (error) {
+      console.error('Error loading presets:', error);
+    }
+  };
+
+  // Save presets to localStorage
+  const savePresetsToStorage = (texts, images) => {
+    try {
+      localStorage.setItem('textPresets', JSON.stringify(texts));
+      localStorage.setItem('imagePresets', JSON.stringify(images));
+    } catch (error) {
+      console.error('Error saving presets:', error);
+    }
+  };
+
+  // Handle paste event for images
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          if (blob) {
+            setImages(prev => [...prev, blob]);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              setImagePreviews(prev => [...prev, reader.result]);
+            };
+            reader.readAsDataURL(blob);
+            showAlert('success', 'Image pasted from clipboard!');
+          }
+        }
+      }
+    };
+
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
   }, []);
 
   const fetchMessages = async () => {
@@ -34,61 +132,92 @@ function App() {
   };
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    const validFiles = [];
+    const previews = [];
+
+    files.forEach(file => {
       if (file.size > 10 * 1024 * 1024) {
-        showAlert('error', 'Image size should not exceed 10MB');
+        showAlert('error', `${file.name} exceeds 10MB limit`);
         return;
       }
 
-      setImage(file);
+      validFiles.push(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result);
+        previews.push(reader.result);
+        if (previews.length === validFiles.length) {
+          setImages(prevImages => [...prevImages, ...validFiles]);
+          setImagePreviews(prevPreviews => [...prevPreviews, ...previews]);
+        }
       };
       reader.readAsDataURL(file);
-    }
+    });
   };
 
-  const removeImage = () => {
-    setImage(null);
-    setImagePreview(null);
+  const removeImage = (index) => {
+    setImages(prevImages => prevImages.filter((_, i) => i !== index));
+    setImagePreviews(prevPreviews => prevPreviews.filter((_, i) => i !== index));
+  };
+
+  const removeAllImages = () => {
+    setImages([]);
+    setImagePreviews([]);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!text.trim()) {
-      showAlert('error', 'Please enter a message text');
+    if (!text.trim() && images.length === 0) {
+      showAlert('error', 'Please enter text or select images');
       return;
     }
 
     setLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('text', text);
-      if (image) {
-        formData.append('image', image);
-      }
-      if (recipientId.trim()) {
-        formData.append('recipientId', recipientId);
+      // Send text if provided
+      if (text.trim()) {
+        const formData = new FormData();
+        formData.append('text', text);
+        if (recipientId.trim()) {
+          formData.append('recipientId', recipientId);
+        }
+
+        await axios.post('/api/messenger/send', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
       }
 
-      const response = await axios.post('/api/messenger/send', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Send each image separately
+      for (const img of images) {
+        const formData = new FormData();
+        formData.append('text', img.name || 'Image');
+        formData.append('image', img);
+        if (recipientId.trim()) {
+          formData.append('recipientId', recipientId);
+        }
 
-      if (response.data.success) {
-        showAlert('success', 'Message sent successfully to Facebook Messenger!');
-        setText('');
-        setImage(null);
-        setImagePreview(null);
-        setRecipientId('');
-        fetchMessages();
+        await axios.post('/api/messenger/send', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        // Wait 1 second between images
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
+
+      showAlert('success', `Successfully sent ${text.trim() ? '1 text + ' : ''}${images.length} image(s) to Facebook Messenger!`);
+      setText('');
+      setImages([]);
+      setImagePreviews([]);
+      setRecipientId('');
+      fetchMessages();
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage = error.response?.data?.error || 'Failed to send message. Please try again.';
@@ -96,6 +225,252 @@ function App() {
       showAlert('error', `${errorMessage}${errorDetails ? ': ' + JSON.stringify(errorDetails) : ''}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Add current text/image to preset lists
+  const addToPresets = () => {
+    if (!text.trim() && images.length === 0) {
+      showAlert('error', 'Please enter text or select images to add to presets');
+      return;
+    }
+
+    const newTextPresets = text.trim() ? [...textPresets, text] : textPresets;
+    let newImagePresets = [...imagePresets];
+    
+    images.forEach((img, index) => {
+      newImagePresets.push({ 
+        name: img.name, 
+        preview: imagePreviews[index], 
+        file: img 
+      });
+    });
+
+    setTextPresets(newTextPresets);
+    setImagePresets(newImagePresets);
+    savePresetsToStorage(newTextPresets, newImagePresets.map(img => ({ name: img.name, preview: img.preview })));
+
+    showAlert('success', 'Added to presets!');
+    setText('');
+    setImages([]);
+    setImagePreviews([]);
+  };
+
+  // Remove preset
+  const removeTextPreset = (index) => {
+    const newPresets = textPresets.filter((_, i) => i !== index);
+    setTextPresets(newPresets);
+    savePresetsToStorage(newPresets, imagePresets.map(img => ({ name: img.name, preview: img.preview })));
+  };
+
+  const removeImagePreset = (index) => {
+    const newPresets = imagePresets.filter((_, i) => i !== index);
+    setImagePresets(newPresets);
+    savePresetsToStorage(textPresets, newPresets.map(img => ({ name: img.name, preview: img.preview })));
+  };
+
+  // Send single text preset
+  const sendSingleTextPreset = async (textMsg, index) => {
+    try {
+      const formData = new FormData();
+      formData.append('text', textMsg);
+      if (recipientId.trim()) {
+        formData.append('recipientId', recipientId);
+      }
+
+      await axios.post('/api/messenger/send', formData);
+      showAlert('success', 'Message sent successfully!');
+      
+      // Remove from presets after successful send
+      removeTextPreset(index);
+      fetchMessages();
+    } catch (error) {
+      console.error('Error sending text preset:', error);
+      showAlert('error', 'Failed to send message');
+    }
+  };
+
+  // Copy single text to clipboard
+  const copySingleText = async (textMsg) => {
+    try {
+      await navigator.clipboard.writeText(textMsg);
+      showAlert('success', '✅ Text copied to clipboard!');
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      showAlert('error', 'Failed to copy');
+    }
+  };
+
+  // Paste single text to current text field
+  const pasteSingleText = (textMsg) => {
+    setText(textMsg);
+    showAlert('success', '✅ Text pasted to input field!');
+    if (textAreaRef.current) {
+      textAreaRef.current.focus();
+    }
+  };
+
+  // Send single image preset
+  const sendSingleImagePreset = async (imgData, index) => {
+    try {
+      const formData = new FormData();
+      formData.append('text', imgData.name || 'Image');
+      
+      // Convert data URL back to blob if needed
+      if (imgData.file) {
+        formData.append('image', imgData.file);
+      } else if (imgData.preview) {
+        const response = await fetch(imgData.preview);
+        const blob = await response.blob();
+        formData.append('image', blob, imgData.name);
+      }
+      
+      if (recipientId.trim()) {
+        formData.append('recipientId', recipientId);
+      }
+
+      await axios.post('/api/messenger/send', formData);
+      showAlert('success', 'Image sent successfully!');
+      
+      // Remove from presets after successful send
+      removeImagePreset(index);
+      fetchMessages();
+    } catch (error) {
+      console.error('Error sending image preset:', error);
+      showAlert('error', 'Failed to send image');
+    }
+  };
+
+  // Copy image name to clipboard
+  const copySingleImage = async (imgData) => {
+    try {
+      await navigator.clipboard.writeText(imgData.name);
+      showAlert('success', '✅ Image name copied to clipboard!');
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      showAlert('error', 'Failed to copy');
+    }
+  };
+
+  // Paste single image to current image field
+  const pasteSingleImage = (imgData) => {
+    if (imgData.file) {
+      setImages(prev => [...prev, imgData.file]);
+      setImagePreviews(prev => [...prev, imgData.preview]);
+      showAlert('success', '✅ Image pasted to input field!');
+    } else {
+      showAlert('error', 'Image file not available');
+    }
+  };
+
+  // Send all presets
+  const sendAllPresets = async () => {
+    if (textPresets.length === 0 && imagePresets.length === 0) {
+      showAlert('error', 'No presets to send');
+      return;
+    }
+
+    setSendingPresets(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // Send all text presets
+      for (const textMsg of textPresets) {
+        try {
+          const formData = new FormData();
+          formData.append('text', textMsg);
+          if (recipientId.trim()) {
+            formData.append('recipientId', recipientId);
+          }
+
+          await axios.post('/api/messenger/send', formData);
+          successCount++;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between messages
+        } catch (error) {
+          console.error('Error sending text preset:', error);
+          failCount++;
+        }
+      }
+
+      // Send all image presets
+      for (const imageData of imagePresets) {
+        try {
+          const formData = new FormData();
+          formData.append('text', imageData.name || 'Image');
+          
+          // Convert data URL back to blob if needed
+          if (imageData.file) {
+            formData.append('image', imageData.file);
+          } else if (imageData.preview) {
+            const response = await fetch(imageData.preview);
+            const blob = await response.blob();
+            formData.append('image', blob, imageData.name);
+          }
+          
+          if (recipientId.trim()) {
+            formData.append('recipientId', recipientId);
+          }
+
+          await axios.post('/api/messenger/send', formData);
+          successCount++;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between messages
+        } catch (error) {
+          console.error('Error sending image preset:', error);
+          failCount++;
+        }
+      }
+
+      showAlert('success', `Sent ${successCount} messages successfully${failCount > 0 ? `, ${failCount} failed` : ''}!`);
+      
+      // Clear presets after successful send
+      if (failCount === 0) {
+        setTextPresets([]);
+        setImagePresets([]);
+        savePresetsToStorage([], []);
+      }
+      
+      fetchMessages();
+    } catch (error) {
+      showAlert('error', 'Error sending presets');
+    } finally {
+      setSendingPresets(false);
+    }
+  };
+
+  // Clear all presets
+  const clearAllPresets = () => {
+    setTextPresets([]);
+    setImagePresets([]);
+    savePresetsToStorage([], []);
+    showAlert('info', 'All presets cleared');
+  };
+
+  // Copy all presets to clipboard
+  const copyPresetsToClipboard = async () => {
+    if (textPresets.length === 0 && imagePresets.length === 0) {
+      showAlert('error', 'No presets to copy');
+      return;
+    }
+
+    let clipboardText = '';
+    
+    // Add text messages (one per line)
+    textPresets.forEach((text) => {
+      clipboardText += `${text}\n`;
+    });
+    
+    // Add image names
+    imagePresets.forEach((img) => {
+      clipboardText += `${img.name}\n`;
+    });
+
+    try {
+      await navigator.clipboard.writeText(clipboardText.trim());
+      showAlert('success', '✅ Copied to clipboard! Paste in notepad or blog.');
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      showAlert('error', 'Failed to copy to clipboard');
     }
   };
 
@@ -130,6 +505,7 @@ function App() {
         <div className="form-group">
           <label htmlFor="text">Message Text *</label>
           <textarea
+            ref={textAreaRef}
             id="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -141,29 +517,42 @@ function App() {
         <div className="form-group">
           <label>Image (optional)</label>
           <div className="file-input-wrapper">
-            <label className={`file-input-label ${image ? 'has-file' : ''}`} htmlFor="image">
-              📷 {image ? 'Change Image' : 'Choose Image'}
+            <label className={`file-input-label ${images.length > 0 ? 'has-file' : ''}`} htmlFor="image">
+              📷 {images.length > 0 ? `${images.length} Image(s) Selected` : 'Choose Images (Multiple)'}
             </label>
             <input
               type="file"
               id="image"
               accept="image/jpeg,image/jpg,image/png,image/gif"
               onChange={handleImageChange}
+              multiple
             />
           </div>
-          {image && (
+          {images.length > 0 && (
             <div className="file-name">
-              Selected: {image.name}
+              Selected: {images.map(img => img.name).join(', ')}
             </div>
           )}
         </div>
 
-        {imagePreview && (
+        {imagePreviews.length > 0 && (
           <div className="image-preview">
-            <img src={imagePreview} alt="Preview" />
-            <br />
-            <button type="button" className="remove-image" onClick={removeImage}>
-              Remove Image
+            <div className="multiple-images-grid">
+              {imagePreviews.map((preview, index) => (
+                <div key={index} className="image-preview-item">
+                  <img src={preview} alt={`Preview ${index + 1}`} />
+                  <button 
+                    type="button" 
+                    className="remove-single-image" 
+                    onClick={() => removeImage(index)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="remove-image" onClick={removeAllImages}>
+              Remove All Images
             </button>
           </div>
         )}
@@ -172,7 +561,167 @@ function App() {
           {loading && <span className="loading-spinner"></span>}
           {loading ? 'Sending...' : 'Send to Messenger'}
         </button>
+
+        <button type="button" className="preset-btn" onClick={addToPresets} disabled={loading}>
+          ➕ Add to Presets
+        </button>
       </form>
+
+      {/* Preset Lists */}
+      {(textPresets.length > 0 || imagePresets.length > 0) && (
+        <div className="presets-section">
+          <div className="presets-header">
+            <h2>📋 Saved Presets (Offline Mode)</h2>
+            <div className="presets-actions">
+              <button 
+                className="copy-clipboard-btn" 
+                onClick={copyPresetsToClipboard}
+              >
+                📋 Copy to Clipboard
+              </button>
+              <button 
+                className="send-all-btn" 
+                onClick={sendAllPresets} 
+                disabled={sendingPresets}
+              >
+                {sendingPresets && <span className="loading-spinner"></span>}
+                {sendingPresets ? 'Sending All...' : `📤 Send All (${textPresets.length + imagePresets.length})`}
+              </button>
+              <button className="clear-all-btn" onClick={clearAllPresets}>
+                🗑️ Clear All
+              </button>
+            </div>
+          </div>
+
+          {textPresets.length > 0 && (
+            <div className="preset-list">
+              <h3>Text Messages ({textPresets.length})</h3>
+              {textPresets.map((textMsg, index) => (
+                <div key={index} className="preset-item">
+                  <span className="preset-text">{textMsg}</span>
+                  <div className="preset-actions">
+                    <button 
+                      className="copy-preset-btn" 
+                      onClick={() => copySingleText(textMsg)}
+                      title="Copy to clipboard"
+                    >
+                      📋
+                    </button>
+                    <button 
+                      className="paste-preset-btn" 
+                      onClick={() => pasteSingleText(textMsg)}
+                      title="Paste to input field"
+                    >
+                      📝
+                    </button>
+                    <button 
+                      className="send-preset-btn" 
+                      onClick={() => sendSingleTextPreset(textMsg, index)}
+                    >
+                      📤 Send
+                    </button>
+                    <button 
+                      className="remove-preset-btn" 
+                      onClick={() => removeTextPreset(index)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {imagePresets.length > 0 && (
+            <div className="preset-list">
+              <h3>Images ({imagePresets.length})</h3>
+              <div className="image-presets-grid">
+                {imagePresets.map((imgData, index) => (
+                  <div key={index} className="image-preset-item">
+                    <img src={imgData.preview} alt={imgData.name} />
+                    <span className="image-preset-name">{imgData.name}</span>
+                    <div className="image-preset-actions">
+                      <button 
+                        className="copy-preset-btn-small" 
+                        onClick={() => copySingleImage(imgData)}
+                        title="Copy name"
+                      >
+                        📋
+                      </button>
+                      <button 
+                        className="paste-preset-btn-small" 
+                        onClick={() => pasteSingleImage(imgData)}
+                        title="Paste to input"
+                      >
+                        📝
+                      </button>
+                      <button 
+                        className="send-preset-btn-small" 
+                        onClick={() => sendSingleImagePreset(imgData, index)}
+                        title="Send"
+                      >
+                        📤
+                      </button>
+                      <button 
+                        className="remove-preset-btn" 
+                        onClick={() => removeImagePreset(index)}
+                        title="Remove"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Clipboard History Modal (Electron only) */}
+      {isElectron && showClipboardHistory && (
+        <div className="modal-overlay" onClick={() => setShowClipboardHistory(false)}>
+          <div className="clipboard-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="clipboard-modal-header">
+              <h2>📋 Clipboard History</h2>
+              <button 
+                className="close-modal-btn" 
+                onClick={() => setShowClipboardHistory(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="clipboard-history-list">
+              {clipboardHistory.length === 0 ? (
+                <p>No clipboard history yet</p>
+              ) : (
+                clipboardHistory.map((item, index) => (
+                  <div key={index} className="clipboard-history-item">
+                    {item.type === 'text' ? (
+                      <>
+                        <span className="clipboard-type-badge">Text</span>
+                        <div className="clipboard-content">{item.content}</div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="clipboard-type-badge">Image</span>
+                        <img 
+                          src={item.preview} 
+                          alt="Clipboard" 
+                          className="clipboard-image-preview"
+                        />
+                      </>
+                    )}
+                    <div className="clipboard-timestamp">
+                      {new Date(item.timestamp).toLocaleString()}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {messages.length > 0 && (
         <div className="message-history">

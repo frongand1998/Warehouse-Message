@@ -48,13 +48,21 @@ const upload = multer({
   }
 });
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/warehouse-message', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.log('MongoDB connection error:', err));
+// MongoDB Connection (optional - will work without it)
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+  })
+  .then(() => console.log('✅ MongoDB connected'))
+  .catch(err => {
+    console.log('⚠️  MongoDB connection error:', err.message);
+    console.log('App will continue without database (messages won\'t be saved)');
+  });
+} else {
+  console.log('⚠️  No MONGODB_URI provided. App will run without database.');
+}
 
 // Import routes
 const messengerRoutes = require('./routes/messenger');

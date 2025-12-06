@@ -64,7 +64,12 @@ router.post('/send', upload.single('image'), async (req, res) => {
       status: 'pending'
     });
 
-    await newMessage.save();
+    try {
+      await newMessage.save();
+    } catch (dbError) {
+      console.log('⚠️  Could not save to database:', dbError.message);
+      // Continue anyway - sending message is more important than saving
+    }
 
     let attachmentId = null;
 
@@ -93,9 +98,13 @@ router.post('/send', upload.single('image'), async (req, res) => {
         attachmentId = uploadResponse.data.attachment_id;
       } catch (error) {
         console.error('Error uploading image to Facebook:', error.response?.data || error.message);
-        newMessage.status = 'failed';
-        newMessage.error = 'Failed to upload image to Facebook';
-        await newMessage.save();
+        try {
+          newMessage.status = 'failed';
+          newMessage.error = 'Failed to upload image to Facebook';
+          await newMessage.save();
+        } catch (dbError) {
+          console.log('⚠️  Could not save to database');
+        }
         return res.status(500).json({ 
           error: 'Failed to upload image to Facebook', 
           details: error.response?.data || error.message 
@@ -105,48 +114,99 @@ router.post('/send', upload.single('image'), async (req, res) => {
 
     // Send the message with text and optional image attachment
     try {
-      const messageData = {
-        recipient: { id: recipient },
-        message: {}
-      };
-
-      // If we have an attachment, include it
+      // If we have an attachment, send image first, then text in separate message
       if (attachmentId) {
-        messageData.message.attachment = {
-          type: 'image',
-          payload: {
-            attachment_id: attachmentId
+        // Send image
+        const imageMessageData = {
+          recipient: { id: recipient },
+          message: {
+            attachment: {
+              type: 'image',
+              payload: {
+                attachment_id: attachmentId
+              }
+            }
           }
         };
-        messageData.message.text = text;
-      } else {
-        messageData.message.text = text;
-      }
 
-      const sendResponse = await axios.post(
-        `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`,
-        messageData
-      );
+        await axios.post(
+          `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`,
+          imageMessageData
+        );
 
-      newMessage.status = 'sent';
-      newMessage.messageId = sendResponse.data.message_id;
-      await newMessage.save();
+        // Send text as separate message
+        const textMessageData = {
+          recipient: { id: recipient },
+          message: {
+            text: text
+          }
+        };
 
-      res.json({
-        success: true,
-        message: 'Message sent successfully',
-        data: {
-          messageId: sendResponse.data.message_id,
-          recipientId: sendResponse.data.recipient_id,
-          text,
-          imageUrl: newMessage.imageUrl
+        const sendResponse = await axios.post(
+          `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`,
+          textMessageData
+        );
+
+        try {
+          newMessage.status = 'sent';
+          newMessage.messageId = sendResponse.data.message_id;
+          await newMessage.save();
+        } catch (dbError) {
+          console.log('⚠️  Could not save to database');
         }
-      });
+
+        res.json({
+          success: true,
+          message: 'Message sent successfully',
+          data: {
+            messageId: sendResponse.data.message_id,
+            recipientId: sendResponse.data.recipient_id,
+            text,
+            imageUrl: newMessage.imageUrl
+          }
+        });
+      } else {
+        // Send text only
+        const messageData = {
+          recipient: { id: recipient },
+          message: {
+            text: text
+          }
+        };
+
+        const sendResponse = await axios.post(
+          `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`,
+          messageData
+        );
+
+        try {
+          newMessage.status = 'sent';
+          newMessage.messageId = sendResponse.data.message_id;
+          await newMessage.save();
+        } catch (dbError) {
+          console.log('⚠️  Could not save to database');
+        }
+
+        res.json({
+          success: true,
+          message: 'Message sent successfully',
+          data: {
+            messageId: sendResponse.data.message_id,
+            recipientId: sendResponse.data.recipient_id,
+            text,
+            imageUrl: newMessage.imageUrl
+          }
+        });
+      }
     } catch (error) {
       console.error('Error sending message to Facebook:', error.response?.data || error.message);
-      newMessage.status = 'failed';
-      newMessage.error = error.response?.data?.error?.message || error.message;
-      await newMessage.save();
+      try {
+        newMessage.status = 'failed';
+        newMessage.error = error.response?.data?.error?.message || error.message;
+        await newMessage.save();
+      } catch (dbError) {
+        console.log('⚠️  Could not save to database');
+      }
       
       res.status(500).json({ 
         error: 'Failed to send message to Facebook', 
@@ -181,6 +241,47 @@ router.get('/messages/:id', async (req, res) => {
   } catch (error) {
     console.error('Error fetching message:', error);
     res.status(500).json({ error: 'Failed to fetch message', details: error.message });
+  }
+});
+
+// Webhook verification endpoint (for Facebook)
+router.get('/webhook', (req, res) => {
+  const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'my_webhook_token_123';
+  
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  
+  if (mode && token) {
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      console.log('Webhook verified!');
+      res.status(200).send(challenge);
+    } else {
+      res.sendStatus(403);
+    }
+  }
+});
+
+// Webhook endpoint to receive messages (captures PSID automatically)
+router.post('/webhook', (req, res) => {
+  const body = req.body;
+
+  if (body.object === 'page') {
+    body.entry.forEach(function(entry) {
+      const webhookEvent = entry.messaging[0];
+      console.log('Webhook event received:', webhookEvent);
+
+      const senderPsid = webhookEvent.sender.id;
+      console.log('📩 Message received from PSID:', senderPsid);
+      console.log('👉 Use this as your RECIPIENT_ID in .env file!');
+
+      // You can store this PSID in your database for later use
+      // Or just copy it from the console logs
+    });
+
+    res.status(200).send('EVENT_RECEIVED');
+  } else {
+    res.sendStatus(404);
   }
 });
 

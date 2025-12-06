@@ -11,11 +11,5 @@
       "src": "/(.*)",
       "dest": "server.js"
     }
-  ],
-  "env": {
-    "FACEBOOK_PAGE_ACCESS_TOKEN": "@facebook_page_access_token",
-    "FACEBOOK_PAGE_ID": "@facebook_page_id",
-    "RECIPIENT_ID": "@recipient_id",
-    "WEBHOOK_VERIFY_TOKEN": "@webhook_verify_token"
-  }
+  ]
 }

@@ -32,7 +32,21 @@ function createWindow() {
     ? "http://localhost:3000"
     : `file://${path.join(__dirname, "..", "build", "index.html")}`;
 
+  console.log("Loading URL:", startURL);
+  console.log("__dirname:", __dirname);
+  console.log("isDev:", isDev);
+
   mainWindow.loadURL(startURL);
+
+  // Always open DevTools to see errors
+  mainWindow.webContents.openDevTools();
+
+  mainWindow.webContents.on(
+    "did-fail-load",
+    (event, errorCode, errorDescription) => {
+      console.error("Failed to load:", errorCode, errorDescription);
+    }
+  );
 
   if (isDev) {
     mainWindow.webContents.openDevTools();
